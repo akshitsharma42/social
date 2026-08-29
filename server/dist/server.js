@@ -8,6 +8,7 @@ import accountRouter from "./routes/accountRoutes.js";
 import postRouter from "./routes/postRoutes.js";
 import activityRouter from "./routes/activityRoutes.js";
 import { initScheduler } from "./services/schedulerService.js";
+import analyticsRouter from "./routes/analyticsRoutes.js";
 const app = express();
 const frontendUrl = process.env.CLIENT_URL || process.env.FRONTEND_URL || "http://localhost:5173";
 const allowedOrigins = new Set([
@@ -44,6 +45,7 @@ app.use("/api/oauth", socialAuthRouter);
 app.use("/api/accounts", accountRouter);
 app.use("/api/posts", postRouter);
 app.use("/api/activity", activityRouter);
+app.use("/api/analytics", analyticsRouter);
 // Initialize Scheduler
 initScheduler();
 // Global Error Handler

@@ -9,8 +9,9 @@ export const initScheduler = () => {
             const now = new Date();
             const postsToPublish = await Post.find({ status: "scheduled", scheduledFor: { $lte: now } });
             for (const post of postsToPublish) {
+                let accounts = [];
                 try {
-                    const accounts = await Account.find({
+                    accounts = await Account.find({
                         user: post.user,
                         platform: { $in: post.platforms },
                         status: "connected",
@@ -39,6 +40,14 @@ export const initScheduler = () => {
                         throw new Error("Failed to get post object from Zernio response");
                     }
                     console.log(`Zernio post created: ${publishedPost._id || publishedPost.id}`);
+                    const externalPostId = String(publishedPost._id || publishedPost.id || "");
+                    post.platformResults.splice(0, post.platformResults.length, ...accounts.map((account) => ({
+                        platform: account.platform,
+                        accountId: account.zernioAccountId,
+                        externalPostId,
+                        status: "published",
+                        publishedAt: new Date(),
+                    })));
                     post.status = "published";
                     await post.save();
                     await ActivityLog.create({
@@ -50,6 +59,12 @@ export const initScheduler = () => {
                 }
                 catch (err) {
                     console.error(`Failed to publish post ${post._id} :`, err?.response?.data || err?.message);
+                    post.platformResults.splice(0, post.platformResults.length, ...accounts.map((account) => ({
+                        platform: account.platform,
+                        accountId: account.zernioAccountId,
+                        status: "failed",
+                        errorMessage: err?.response?.data?.message || err?.message || "Publishing failed",
+                    })));
                     post.status = "failed";
                     await post.save();
                 }
