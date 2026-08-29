@@ -16,6 +16,7 @@ const AIComposer = () => {
    // Scheduling state
    const [activeScheduler, setActiveScheduler] = useState<any>(null);
    const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([])
+  const [mediaFormat, setMediaFormat] = useState("feed_portrait")
    const [scheduledDate, setScheduledDate] = useState("");
    const [scheduledTime, setScheduledTime] = useState("");
    const [scheduling, setScheduling] = useState(false);
@@ -69,6 +70,7 @@ const AIComposer = () => {
         content: activeScheduler.content,
         mediaUrl: activeScheduler.mediaUrl,
         mediaType: activeScheduler.mediaType,
+        mediaFormat: selectedPlatforms.includes("instagram") ? mediaFormat : undefined,
         platforms: selectedPlatforms,
         scheduledFor,
         status: "scheduled",
@@ -76,6 +78,7 @@ const AIComposer = () => {
         toast.success("AI Post scheduled!");
         setActiveScheduler(null)
         setSelectedPlatforms([]);
+        setMediaFormat("feed_portrait");
         setScheduledDate("");
         setScheduledTime("");
     } catch (error:any) {
@@ -223,6 +226,30 @@ const AIComposer = () => {
                     })}
                   </div>
                 </div>
+
+                {selectedPlatforms.includes("instagram") && (
+                  <div>
+                    <label className="block text-xs text-slate-600 uppercase tracking-widest mb-4">Instagram Format</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { id: "feed_portrait", label: "Feed portrait", ratio: "4:5" },
+                        { id: "square", label: "Square", ratio: "1:1" },
+                        { id: "landscape", label: "Landscape", ratio: "1.91:1" },
+                        { id: "reel", label: "Reel / Story", ratio: "9:16" },
+                      ].map((format) => (
+                        <button
+                          key={format.id}
+                          type="button"
+                          onClick={() => setMediaFormat(format.id)}
+                          className={`text-left px-3 py-2 rounded-lg border text-xs ${mediaFormat === format.id ? "bg-red-50 border-red-300 text-red-600" : "bg-white border-slate-200 text-slate-500 hover:border-slate-300"}`}
+                        >
+                          <span className="block font-medium">{format.label}</span>
+                          <span className="text-slate-400">{format.ratio}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="relative">

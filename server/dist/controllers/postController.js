@@ -3,6 +3,20 @@ import axios from "axios";
 import { cloudinary } from "../config/cloudinary.js";
 import { Generation } from "../models/Generation.js";
 import { Post } from "../models/Post.js";
+const platformCharacterLimits = {
+    twitter: 280,
+    linkedin: 3000,
+    facebook: 5000,
+    instagram: 2200,
+};
+const mediaTransformations = {
+    feed_portrait: { width: 1080, height: 1350 },
+    square: { width: 1080, height: 1080 },
+    landscape: { width: 1080, height: 566 },
+    reel: { width: 1080, height: 1920 },
+    story: { width: 1080, height: 1920 },
+};
+const validMediaFormats = Object.keys(mediaTransformations);
 // Helper to poll Leonardo.ai
 const pollLeonardoJob = async (generationId, apiKey) => {
     const maxRetries = 20;
@@ -151,6 +165,32 @@ export const schedulePost = async (req, res) => {
                 parsedPlatforms = platforms.split(",");
             }
         }
+        if (!Array.isArray(parsedPlatforms) || parsedPlatforms.length === 0) {
+            res.status(400).json({ message: "Select at least one platform" });
+            return;
+        }
+        const maxCharacters = Math.min(...parsedPlatforms.map((platform) => platformCharacterLimits[platform] || 5000));
+        if (typeof content !== "string" || content.trim().length === 0) {
+            res.status(400).json({ message: "Post content is required" });
+            return;
+        }
+        if (content.length > maxCharacters) {
+            res.status(400).json({ message: `Content exceeds the ${maxCharacters}-character limit for the selected platforms` });
+            return;
+        }
+        const mediaFormat = req.body.mediaFormat || undefined;
+        if (mediaFormat && !validMediaFormats.includes(mediaFormat)) {
+            res.status(400).json({ message: "Invalid media format" });
+            return;
+        }
+        if (parsedPlatforms.includes("instagram") && !req.file && !req.body.mediaUrl) {
+            res.status(400).json({ message: "Instagram posts require an image or video" });
+            return;
+        }
+        if (parsedPlatforms.includes("instagram") && !mediaFormat) {
+            res.status(400).json({ message: "Select an Instagram media format" });
+            return;
+        }
         let mediaUrl = req.body.mediaUrl;
         let mediaType = req.body.mediaType;
         if (req.file) {
@@ -165,6 +205,18 @@ export const schedulePost = async (req, res) => {
             });
             mediaUrl = result.secure_url;
             mediaType = result.resource_type === "video" ? "video" : "image";
+            if (mediaType === "image" && mediaFormat) {
+                const dimensions = mediaTransformations[mediaFormat];
+                mediaUrl = cloudinary.url(result.public_id, {
+                    secure: true,
+                    transformation: [{
+                            width: dimensions.width,
+                            height: dimensions.height,
+                            crop: "fill",
+                            gravity: "auto",
+                        }],
+                });
+            }
         }
         const post = await Post.create({
             user: req.user._id,
@@ -172,6 +224,7 @@ export const schedulePost = async (req, res) => {
             platforms: parsedPlatforms,
             mediaUrl,
             mediaType,
+            mediaFormat,
             scheduledFor,
             status,
         });

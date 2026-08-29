@@ -7,13 +7,31 @@ import toast from "react-hot-toast";
 
 const Scheduler = () => {
 
+  const platformCharacterLimits: Record<string, number> = {
+    twitter: 280,
+    linkedin: 3000,
+    facebook: 5000,
+    instagram: 2200,
+  };
+  const mediaFormats = [
+    { id: "feed_portrait", label: "Feed portrait", ratio: "4:5", className: "aspect-[4/5]" },
+    { id: "square", label: "Square", ratio: "1:1", className: "aspect-square" },
+    { id: "landscape", label: "Landscape", ratio: "1.91:1", className: "aspect-[1.91/1]" },
+    { id: "reel", label: "Reel / Story", ratio: "9:16", className: "aspect-[9/16]" },
+  ];
   const [posts, setPosts] = useState<any[]>([]);
   const [content, setContent] = useState("");
   const [scheduledDate, setScheduledDate] = useState("");
   const [scheduledTime, setScheduledTime] = useState("");
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
   const [mediaFile, setMediaFile] = useState<File | null>(null);
+  const [mediaFormat, setMediaFormat] = useState("feed_portrait");
   const [loading, setLoading] = useState(false);
+
+  const maxCharacters = selectedPlatforms.length > 0
+    ? Math.min(...selectedPlatforms.map((platform) => platformCharacterLimits[platform] || 5000))
+    : 5000;
+  const selectedMediaFormat = mediaFormats.find((format) => format.id === mediaFormat) || mediaFormats[0];
 
   const fetchPosts = async () => {
     try {
@@ -49,6 +67,14 @@ const Scheduler = () => {
       toast.error("Instagram requires an image or video");
       return;
     }
+    if(selectedPlatforms.includes('instagram') && !mediaFormat){
+      toast.error("Select an Instagram media format");
+      return;
+    }
+    if(content.length > maxCharacters){
+      toast.error(`Content cannot exceed ${maxCharacters} characters for the selected platforms`);
+      return;
+    }
 
     const scheduledFor = new Date(`${scheduledDate}T${scheduledTime}`).toISOString();
     const formData = new FormData();
@@ -56,6 +82,7 @@ const Scheduler = () => {
     formData.append("scheduledFor", scheduledFor);
     formData.append("status", "scheduled");
     formData.append("platforms", JSON.stringify(selectedPlatforms));
+    if(selectedPlatforms.includes("instagram")) formData.append("mediaFormat", mediaFormat);
     if(mediaFile) formData.append("media", mediaFile);
 
     setLoading(true)
@@ -66,6 +93,7 @@ const Scheduler = () => {
       setScheduledDate("");
       setScheduledTime("");
       setSelectedPlatforms([]);
+      setMediaFormat("feed_portrait");
       setMediaFile(null);
       fetchPosts();
     } catch (error:any) {
@@ -101,12 +129,31 @@ const Scheduler = () => {
                 </div>
               </div>
 
+              {selectedPlatforms.includes("instagram") && (
+                <div>
+                  <label className="block text-xs text-slate-500 uppercase mb-2">Instagram format</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {mediaFormats.map((format) => (
+                      <button
+                        key={format.id}
+                        type="button"
+                        onClick={() => setMediaFormat(format.id)}
+                        className={`text-left px-3 py-2 rounded-lg border transition-colors ${mediaFormat === format.id ? "border-red-300 bg-red-50 text-red-600" : "border-slate-200 text-slate-500 hover:border-slate-300"}`}
+                      >
+                        <span className="block text-xs font-medium">{format.label}</span>
+                        <span className="block text-[11px] text-slate-400">{format.ratio}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Content */}
               <div>
                 <label className="block text-xs text-slate-500 uppercase mb-2">Content</label>
-                <textarea required rows={5} placeholder="What do you want to share today?" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-slate-900 text-sm placeholder-slate-400 outline-none resize-none" value={content} onChange={(e)=>setContent(e.target.value)}/>
-                  <div className={`text-right text-xs mt-1 font-medium ${content.length > 270 ? "text-red-500" : "text-slate-400"}`}>
-                    {content.length}/280
+                <textarea required rows={8} maxLength={maxCharacters} placeholder="What do you want to share today?" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-slate-900 text-sm placeholder-slate-400 outline-none resize-none" value={content} onChange={(e)=>setContent(e.target.value)}/>
+                  <div className={`text-right text-xs mt-1 font-medium ${content.length === maxCharacters ? "text-red-500" : "text-slate-400"}`}>
+                    {content.length}/{maxCharacters}
                   </div>
               </div>
 
@@ -117,7 +164,7 @@ const Scheduler = () => {
                   <div className="relative rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
                     {mediaFile.type.startsWith("image/") 
                     ? 
-                    <img src={URL.createObjectURL(mediaFile)} alt="preview" className="w-full h-40 object-cover"/> 
+                    <img src={URL.createObjectURL(mediaFile)} alt="preview" className={`w-full ${selectedPlatforms.includes("instagram") ? selectedMediaFormat.className : "h-40"} object-cover`}/> 
                     : 
                     <video src={URL.createObjectURL(mediaFile)} className="w-full h-40 object-cover" controls/>}
 
